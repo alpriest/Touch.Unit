@@ -61,9 +61,12 @@ class SimpleListener {
 			server.Start ();
 			
 			do {
+				Console.WriteLine("Accepting Tcp Client");
 				using (TcpClient client = server.AcceptTcpClient ()) {
 					processed = Processing (client);
 				}
+				Console.WriteLine("Processed Tcp Client");
+				Console.WriteLine("AutoExit={0}, processed={1}", AutoExit, processed);
 			} while (!AutoExit || !processed);
 		}
 		catch (Exception e) {
@@ -154,7 +157,7 @@ class SimpleListener {
 			os.Parse (args);
 			if (help)
 				ShowHelp (os);
-			
+
 			var listener = new SimpleListener ();
 			
 			IPAddress ip;
