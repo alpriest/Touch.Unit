@@ -70,6 +70,7 @@ class SimpleListener {
 				}
 				else
 				{
+					Console.WriteLine("WARNING: No connection was found, sleeping 10 seconds");
 					Thread.Sleep(new TimeSpan(0, 0, 10));
 					++tries;
 				}
@@ -90,7 +91,8 @@ class SimpleListener {
 			}
 			else
 			{
-				Console.WriteLine("No connection was waiting");
+				Console.WriteLine("ERROR: No connection was found");
+				return 1;
 			}
 		}
 		catch (Exception e) {
@@ -330,7 +332,7 @@ class SimpleListener {
 	{
 		foreach(var line in lines)
 		{
-			Console.WriteLine(line);
+			Console.WriteLine(line());
 		}
 	}
 
