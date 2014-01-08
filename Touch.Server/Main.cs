@@ -59,6 +59,21 @@ class SimpleListener {
 		server = new TcpListener (Address, Port);
 		try {
 			server.Start ();
+
+			var tries = 0;
+			var connectionFound = false;
+			do
+			{
+				if (!server.Pending())
+				{
+					Thread.Sleep(new TimeSpan(0, 0, 10));
+					++tries;
+				}
+				else
+				{
+					connectionFound = true;
+				}
+			} while (!connectionFound || tries > 5);
 			
 			do {
 				Console.WriteLine("Accepting Tcp Client");
@@ -155,6 +170,19 @@ class SimpleListener {
 		
 		try {
 			os.Parse (args);
+			DisplayArgValues(
+				() => "help=" + help,
+				() => "address=" + address,
+				() => "port=" + port,
+				() => "log_path=" + log_path,
+				() => "log_file=" + log_file,
+				() => "launchdev=" + launchdev,
+				() => "launchsim=" + launchsim,
+				() => "autoexit=" + autoexit,
+				() => "device_name=" + device_name,
+				() => "user_name=" + user_name,
+				() => "password=" + password,
+				() => "timeout=" + timeout);
 			if (help)
 				ShowHelp (os);
 
@@ -274,6 +302,7 @@ class SimpleListener {
 						if (proc.ExitCode != 0)
 							listener.Cancel ();
 						Console.WriteLine (output.ToString ());
+						Console.WriteLine("Process terminating");
 					}
 				});
 			}
@@ -285,6 +314,14 @@ class SimpleListener {
 		} catch (Exception ex) {
 			Console.WriteLine (ex);
 			return 1;
+		}
+	}
+
+	private static void DisplayArgValues(params Func<string>[] lines)
+	{
+		foreach(var line in lines)
+		{
+			Console.WriteLine(line);
 		}
 	}
 
