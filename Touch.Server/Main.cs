@@ -64,25 +64,34 @@ class SimpleListener {
 			var connectionFound = false;
 			do
 			{
-				if (!server.Pending())
+				if (server.Pending())
+				{
+					connectionFound = true;
+				}
+				else
 				{
 					Thread.Sleep(new TimeSpan(0, 0, 10));
 					++tries;
 				}
-				else
+			} while (!connectionFound && tries < 5);
+
+			if (connectionFound)
+			{
+				do
 				{
-					connectionFound = true;
-				}
-			} while (!connectionFound || tries > 5);
-			
-			do {
-				Console.WriteLine("Accepting Tcp Client");
-				using (TcpClient client = server.AcceptTcpClient ()) {
-					processed = Processing (client);
-				}
-				Console.WriteLine("Processed Tcp Client");
-				Console.WriteLine("AutoExit={0}, processed={1}", AutoExit, processed);
-			} while (!AutoExit || !processed);
+					Console.WriteLine("Accepting Tcp Client");
+					using (TcpClient client = server.AcceptTcpClient())
+					{
+						processed = Processing(client);
+					}
+					Console.WriteLine("Processed Tcp Client");
+					Console.WriteLine("AutoExit={0}, processed={1}", AutoExit, processed);
+				} while (!AutoExit || !processed);
+			}
+			else
+			{
+				Console.WriteLine("No connection was waiting");
+			}
 		}
 		catch (Exception e) {
 			Console.WriteLine ("[{0}] : {1}", DateTime.Now, e);
