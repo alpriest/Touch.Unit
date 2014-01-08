@@ -73,6 +73,7 @@ class SimpleListener {
 		finally {
 			server.Stop ();
 		}
+		Console.WriteLine("Touch.Unit Simple Server exiting");
 		
 		return 0;
 	}
@@ -132,6 +133,7 @@ class SimpleListener {
 		string device_name = String.Empty;
 		string user_name = null;
 		string password = null;
+		int timeout = 300000;
 		
 		var os = new OptionSet () {
 			{ "h|?|help", "Display help", v => help = true },
@@ -145,6 +147,7 @@ class SimpleListener {
 			{ "devname=", "Specify the device to connect to", v => device_name = v},
 			{ "username=", "Specify the username to spawn as", v => user_name = v},
 			{ "password=", "Specify the password to spawn as", v => password = v},
+			{ "timeout=", "Specify the time to wait for the simulator before timing out", v => timeout = int.Parse(v)},
 		};
 		
 		try {
@@ -264,7 +267,7 @@ class SimpleListener {
 						proc.Start ();
 						proc.BeginErrorReadLine ();
 						proc.BeginOutputReadLine ();
-						proc.WaitForExit ();
+						proc.WaitForExit (timeout);
 						if (proc.ExitCode != 0)
 							listener.Cancel ();
 						Console.WriteLine (output.ToString ());
