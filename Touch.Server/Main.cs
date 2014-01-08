@@ -22,6 +22,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Security;
 using System.Text;
 using System.Diagnostics;
 using System.Threading;
@@ -129,6 +130,8 @@ class SimpleListener {
 		string launchsim = null;
 		bool autoexit = false;
 		string device_name = String.Empty;
+		string user_name = null;
+		string password = null;
 		
 		var os = new OptionSet () {
 			{ "h|?|help", "Display help", v => help = true },
@@ -140,6 +143,8 @@ class SimpleListener {
 			{ "launchsim=", "Run the specified app on the simulator (specify using path to *.app directory)", v => launchsim = v },
 			{ "autoexit", "Exit the server once a test run has completed (default: false)", v => autoexit = true },
 			{ "devname=", "Specify the device to connect to", v => device_name = v},
+			{ "username=", "Specify the username to spawn as", v => user_name = v},
+			{ "password=", "Specify the password to spawn as", v => password = v},
 		};
 		
 		try {
@@ -252,6 +257,10 @@ class SimpleListener {
 								output.AppendLine (e.Data);
 							}
 						};
+						if (!string.IsNullOrEmpty(user_name))
+							proc.StartInfo.UserName = user_name;
+						if (!string.IsNullOrEmpty(password))
+							proc.StartInfo.Password = Password(password);
 						proc.Start ();
 						proc.BeginErrorReadLine ();
 						proc.BeginOutputReadLine ();
@@ -271,5 +280,15 @@ class SimpleListener {
 			Console.WriteLine (ex);
 			return 1;
 		}
-	}   
+	}
+
+	private static SecureString Password(string password)
+	{
+		var pass = new SecureString();
+		foreach (var c in password.ToCharArray())
+		{
+			pass.AppendChar(c);
+		}
+		return pass;
+	}
 }
