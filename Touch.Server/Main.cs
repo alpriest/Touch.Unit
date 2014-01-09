@@ -26,22 +26,26 @@ using System.Security;
 using System.Text;
 using System.Diagnostics;
 using System.Threading;
-
 using Mono.Options;
 
 // a simple, blocking (i.e. one device/app at the time), listener
-class SimpleListener {
+using System.Threading.Tasks;
 
+class SimpleListener
+{
 	static byte[] buffer = new byte [16 * 1024];
-
 	TcpListener server;
-	
+
 	IPAddress Address { get; set; }
+
 	int Port { get; set; }
+
 	string LogPath { get; set; }
+
 	string LogFile { get; set; }
+
 	bool AutoExit { get; set; }
-	
+
 	public void Cancel ()
 	{
 		try {
@@ -50,8 +54,8 @@ class SimpleListener {
 			// We might have stopped already, so just swallow any exceptions.
 		}
 	}
-	
-	public int Start ()
+
+	public int Start (Action createProcess)
 	{
 		bool processed;
 		
@@ -59,50 +63,25 @@ class SimpleListener {
 		server = new TcpListener (Address, Port);
 		try {
 			server.Start ();
+			Console.WriteLine ("Server started");
+			createProcess ();
+			Console.WriteLine ("Process spawned");
 
-			var tries = 0;
-			var connectionFound = false;
-			do
-			{
-				if (server.Pending())
-				{
-					connectionFound = true;
+			do {
+				using (TcpClient client = server.AcceptTcpClient ()) {
+					Console.WriteLine ("Accepted Tcp Client");
+					processed = Processing (client);
 				}
-				else
-				{
-					Console.WriteLine("WARNING: No connection was found, sleeping 10 seconds");
-					Thread.Sleep(new TimeSpan(0, 0, 10));
-					++tries;
-				}
-			} while (!connectionFound && tries < 5);
-
-			if (connectionFound)
-			{
-				do
-				{
-					Console.WriteLine("Accepting Tcp Client");
-					using (TcpClient client = server.AcceptTcpClient())
-					{
-						processed = Processing(client);
-					}
-					Console.WriteLine("Processed Tcp Client");
-					Console.WriteLine("AutoExit={0}, processed={1}", AutoExit, processed);
-				} while (!AutoExit || !processed);
-			}
-			else
-			{
-				Console.WriteLine("ERROR: No connection was found");
-				return 1;
-			}
-		}
-		catch (Exception e) {
+				Console.WriteLine ("Processed Tcp Client");
+				Console.WriteLine ("AutoExit={0}, processed={1}", AutoExit, processed);
+			} while (!AutoExit || !processed);
+		} catch (Exception e) {
 			Console.WriteLine ("[{0}] : {1}", DateTime.Now, e);
 			return 1;
-		}
-		finally {
+		} finally {
 			server.Stop ();
 		}
-		Console.WriteLine("Touch.Unit Simple Server exiting");
+		Console.WriteLine ("Touch.Unit Simple Server exiting");
 		
 		return 0;
 	}
@@ -116,7 +95,7 @@ class SimpleListener {
 		using (FileStream fs = File.OpenWrite (logfile)) {
 			// a few extra bits of data only available from this side
 			string header = String.Format ("[Local Date/Time:\t{1}]{0}[Remote Address:\t{2}]{0}", 
-				Environment.NewLine, DateTime.Now, remote);
+				                Environment.NewLine, DateTime.Now, remote);
 			byte[] array = Encoding.UTF8.GetBytes (header);
 			fs.Write (array, 0, array.Length);
 			fs.Flush ();
@@ -162,38 +141,26 @@ class SimpleListener {
 		string device_name = String.Empty;
 		string user_name = null;
 		string password = null;
-		int timeout = 300000;
-		
+
 		var os = new OptionSet () {
 			{ "h|?|help", "Display help", v => help = true },
-			{ "ip", "IP address to listen (default: Any)", v => address = v },
-			{ "port", "TCP port to listen (default: 16384)", v => port = v },
-			{ "logpath", "Path to save the log files (default: .)", v => log_path = v },
+			{ "ip=", "IP address to listen (default: Any)", v => address = v },
+			{ "port=", "TCP port to listen (default: 16384)", v => port = v },
+			{ "logpath=", "Path to save the log files (default: .)", v => log_path = v },
 			{ "logfile=", "Filename to save the log to (default: automatically generated)", v => log_file = v },
-			{ "launchdev=", "Run the specified app on a device (specify using bundle identifier)", v => launchdev = v },
-			{ "launchsim=", "Run the specified app on the simulator (specify using path to *.app directory)", v => launchsim = v },
+			{ "launchdev=", "Run the specified app on a device (specify using bundle identifier)", v => launchdev = v }, {
+				"launchsim=",
+				"Run the specified app on the simulator (specify using path to *.app directory)",
+				v => launchsim = v
+			},
 			{ "autoexit", "Exit the server once a test run has completed (default: false)", v => autoexit = true },
-			{ "devname=", "Specify the device to connect to", v => device_name = v},
-			{ "username=", "Specify the username to spawn as", v => user_name = v},
-			{ "password=", "Specify the password to spawn as", v => password = v},
-			{ "timeout=", "Specify the time to wait for the simulator before timing out", v => timeout = int.Parse(v)},
+			{ "devname=", "Specify the device to connect to", v => device_name = v },
+			{ "username=", "Specify the username to spawn as", v => user_name = v },
+			{ "password=", "Specify the password to spawn as", v => password = v },
 		};
 		
 		try {
 			os.Parse (args);
-			DisplayArgValues(
-				() => "help=" + help,
-				() => "address=" + address,
-				() => "port=" + port,
-				() => "log_path=" + log_path,
-				() => "log_file=" + log_file,
-				() => "launchdev=" + launchdev,
-				() => "launchsim=" + launchsim,
-				() => "autoexit=" + autoexit,
-				() => "device_name=" + device_name,
-				() => "user_name=" + user_name,
-				() => "password=" + password,
-				() => "timeout=" + timeout);
 			if (help)
 				ShowHelp (os);
 
@@ -217,8 +184,11 @@ class SimpleListener {
 			if (String.IsNullOrEmpty (mt_root))
 				mt_root = "/Developer/MonoTouch";
 
+			Action processLauncher = null;
+
 			if (launchdev != null) {
-				ThreadPool.QueueUserWorkItem ((v) => {
+				processLauncher = () => {
+					Thread.Sleep (10);
 					using (Process proc = new Process ()) {
 						StringBuilder output = new StringBuilder ();
 						StringBuilder procArgs = new StringBuilder ();
@@ -266,11 +236,12 @@ class SimpleListener {
 							listener.Cancel ();
 						Console.WriteLine (output.ToString ());
 					}
-				});
+				};
 			}
 			
 			if (launchsim != null) {
-				ThreadPool.QueueUserWorkItem ((v) => {
+				processLauncher = () => {
+					Thread.Sleep (10);
 					using (Process proc = new Process ()) {
 						StringBuilder output = new StringBuilder ();
 						StringBuilder procArgs = new StringBuilder ();
@@ -302,23 +273,23 @@ class SimpleListener {
 								output.AppendLine (e.Data);
 							}
 						};
-						if (!string.IsNullOrEmpty(user_name))
+						if (!string.IsNullOrEmpty (user_name))
 							proc.StartInfo.UserName = user_name;
-						if (!string.IsNullOrEmpty(password))
-							proc.StartInfo.Password = Password(password);
+						if (!string.IsNullOrEmpty (password))
+							proc.StartInfo.Password = Password (password);
 						proc.Start ();
 						proc.BeginErrorReadLine ();
 						proc.BeginOutputReadLine ();
-						proc.WaitForExit (timeout);
+						proc.WaitForExit ();
 						if (proc.ExitCode != 0)
 							listener.Cancel ();
 						Console.WriteLine (output.ToString ());
-						Console.WriteLine("Process terminating");
+						Console.WriteLine ("Process terminating");
 					}
-				});
+				};
 			}
 			
-			return listener.Start ();
+			return listener.Start (processLauncher);
 		} catch (OptionException oe) {
 			Console.WriteLine ("{0} for options '{1}'", oe.Message, oe.OptionName);
 			return 1;
@@ -328,20 +299,11 @@ class SimpleListener {
 		}
 	}
 
-	private static void DisplayArgValues(params Func<string>[] lines)
+	private static SecureString Password (string password)
 	{
-		foreach(var line in lines)
-		{
-			Console.WriteLine(line());
-		}
-	}
-
-	private static SecureString Password(string password)
-	{
-		var pass = new SecureString();
-		foreach (var c in password.ToCharArray())
-		{
-			pass.AppendChar(c);
+		var pass = new SecureString ();
+		foreach (var c in password.ToCharArray()) {
+			pass.AppendChar (c);
 		}
 		return pass;
 	}

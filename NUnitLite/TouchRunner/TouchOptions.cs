@@ -24,12 +24,12 @@ using MonoTouch.Foundation;
 using MonoTouch.UIKit;
 using Mono.Options;
 
-namespace MonoTouch.NUnit.UI {
-	
-	public class TouchOptions {
-
+namespace MonoTouch.NUnit.UI
+{
+	public class TouchOptions
+	{
 		static public TouchOptions Current = new TouchOptions ();
-		
+
 		public TouchOptions ()
 		{
 			var defaults = NSUserDefaults.StandardUserDefaults;
@@ -52,23 +52,23 @@ namespace MonoTouch.NUnit.UI {
 				Console.WriteLine ("{0} for options '{1}'", oe.Message, oe.OptionName);
 			}
 		}
-		
+
 		private bool EnableNetwork { get; set; }
-		
-		public string HostName { get; private set; }
-		
-		public int HostPort { get; private set; }
-		
+
+		public string HostName { get; set; }
+
+		public int HostPort { get; set; }
+
 		public bool AutoStart { get; set; }
-		
+
 		public bool TerminateAfterExecution { get; set; }
-		
+
 		public bool ShowUseNetworkLogger {
 			get { return (EnableNetwork && !String.IsNullOrWhiteSpace (HostName) && (HostPort > 0)); }
 		}
 
 		public bool SortNames { get; set; }
-		
+
 		[CLSCompliant (false)]
 		public UIViewController GetViewController ()
 		{
