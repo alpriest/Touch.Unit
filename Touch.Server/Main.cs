@@ -200,7 +200,6 @@ class SimpleListener
 
 			if (launchdev != null) {
 				processLauncher = () => {
-					Thread.Sleep (10);
 					using (Process proc = new Process ()) {
 						StringBuilder output = new StringBuilder ();
 						StringBuilder procArgs = new StringBuilder ();
@@ -240,7 +239,11 @@ class SimpleListener
 								output.AppendLine (e.Data);
 							}
 						};
-						proc.Start ();
+						if (!string.IsNullOrEmpty(user_name))
+							proc.StartInfo.UserName = user_name;
+						if (!string.IsNullOrEmpty(password))
+							proc.StartInfo.Password = Password(password);
+						proc.Start();
 						proc.BeginErrorReadLine ();
 						proc.BeginOutputReadLine ();
 						proc.WaitForExit ();
@@ -253,7 +256,6 @@ class SimpleListener
 			
 			if (launchsim != null) {
 				processLauncher = () => {
-					Thread.Sleep (10);
 					using (Process proc = new Process ()) {
 						StringBuilder output = new StringBuilder ();
 						StringBuilder procArgs = new StringBuilder ();
