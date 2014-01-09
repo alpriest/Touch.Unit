@@ -46,6 +46,8 @@ class SimpleListener
 
 	bool AutoExit { get; set; }
 
+	bool IsXml { get; set; }
+
 	public void Cancel ()
 	{
 		try {
@@ -73,7 +75,6 @@ class SimpleListener
 					processed = Processing (client);
 				}
 				Console.WriteLine ("Processed Tcp Client");
-				Console.WriteLine ("AutoExit={0}, processed={1}", AutoExit, processed);
 			} while (!AutoExit || !processed);
 		} catch (Exception e) {
 			Console.WriteLine ("[{0}] : {1}", DateTime.Now, e);
@@ -93,9 +94,7 @@ class SimpleListener
 		Console.WriteLine ("Connection from {0} saving logs to {1}", remote, logfile);
 
 		using (FileStream fs = File.OpenWrite (logfile)) {
-			// a few extra bits of data only available from this side
-			string header = String.Format ("[Local Date/Time:\t{1}]{0}[Remote Address:\t{2}]{0}", 
-				                Environment.NewLine, DateTime.Now, remote);
+			var header = BuildHeader (IsXml, remote);
 			byte[] array = Encoding.UTF8.GetBytes (header);
 			fs.Write (array, 0, array.Length);
 			fs.Flush ();
@@ -117,6 +116,16 @@ class SimpleListener
 		}
 		
 		return true;
+	}
+	// a few extra bits of data only available from this side
+	static string BuildHeader (bool isXml, string remote)
+	{
+		// We can't output here or we'll mess break the Xml file format
+		if (isXml) {
+			return string.Empty;
+		} else {
+			return String.Format ("[Local Date/Time:\t{1}]{0}[Remote Address:\t{2}]{0}", Environment.NewLine, DateTime.Now, remote);
+		}
 	}
 
 	static void ShowHelp (OptionSet os)
@@ -141,6 +150,7 @@ class SimpleListener
 		string device_name = String.Empty;
 		string user_name = null;
 		string password = null;
+		bool is_xml = false;
 
 		var os = new OptionSet () {
 			{ "h|?|help", "Display help", v => help = true },
@@ -157,6 +167,7 @@ class SimpleListener
 			{ "devname=", "Specify the device to connect to", v => device_name = v },
 			{ "username=", "Specify the username to spawn as", v => user_name = v },
 			{ "password=", "Specify the password to spawn as", v => password = v },
+			{ "xml", "Output is Xml format (default: false)", v => is_xml = true },
 		};
 		
 		try {
@@ -179,6 +190,7 @@ class SimpleListener
 			listener.LogPath = log_path ?? ".";
 			listener.LogFile = log_file;
 			listener.AutoExit = autoexit;
+			listener.IsXml = is_xml;
 			
 			string mt_root = Environment.GetEnvironmentVariable ("MONOTOUCH_ROOT");
 			if (String.IsNullOrEmpty (mt_root))

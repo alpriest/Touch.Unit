@@ -21,14 +21,13 @@
 using System;
 using System.IO;
 using System.Text;
-
 using NUnitLite.Runner;
 using MonoTouch.NUnit.UI;
 
-namespace MonoTouch.NUnit {
-
-	public class NUnitOutputTextWriter : TextWriter {
-
+namespace MonoTouch.NUnit
+{
+	public class NUnitOutputTextWriter : TextWriter
+	{
 		bool real_time_reporting;
 
 		public NUnitOutputTextWriter (TouchRunner runner, TextWriter baseWriter, OutputWriter xmlWriter)

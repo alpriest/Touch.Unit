@@ -25,21 +25,24 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
-
 using MonoTouch.Dialog;
 using MonoTouch.Foundation;
 using MonoTouch.ObjCRuntime;
 using MonoTouch.UIKit;
-
 using NUnit.Framework.Api;
 using NUnit.Framework.Internal;
 using NUnit.Framework.Internal.Commands;
 using NUnit.Framework.Internal.WorkItems;
 
-namespace MonoTouch.NUnit.UI {
-	
-	public class TouchRunner : ITestListener {
-		
+namespace MonoTouch.NUnit.UI
+{
+	public interface ITestWriter
+	{
+		void WriteCommentLine (string format, params string[] args);
+	}
+
+	public class TouchRunner : ITestListener
+	{
 		UIWindow window;
 		int passed;
 		int failed;
@@ -57,30 +60,30 @@ namespace MonoTouch.NUnit.UI {
 			this.window = window;
 			filter = TestFilter.Empty;
 		}
-		
+
 		public bool AutoStart {
 			get { return TouchOptions.Current.AutoStart; }
 			set { TouchOptions.Current.AutoStart = value; }
 		}
-		
+
 		public ITestFilter Filter {
 			get { return filter; }
 			set { filter = value; }
 		}
-		
+
 		public bool TerminateAfterExecution {
 			get { return TouchOptions.Current.TerminateAfterExecution; }
 			set { TouchOptions.Current.TerminateAfterExecution = value; }
 		}
-		
+
 		[CLSCompliant (false)]
 		public UINavigationController NavigationController {
-			get { return (UINavigationController) window.RootViewController; }
+			get { return (UINavigationController)window.RootViewController; }
 		}
-		
+
 		List<Assembly> assemblies = new List<Assembly> ();
 		ManualResetEvent mre = new ManualResetEvent (false);
-		
+
 		public void Add (Assembly assembly)
 		{
 			if (assembly == null)
@@ -88,13 +91,13 @@ namespace MonoTouch.NUnit.UI {
 			
 			assemblies.Add (assembly);
 		}
-		
+
 		static void TerminateWithSuccess ()
 		{
 			Selector selector = new Selector ("terminateWithSuccess");
 			UIApplication.SharedApplication.PerformSelector (selector, UIApplication.SharedApplication, 0);						
 		}
-		
+
 		[CLSCompliant (false)]
 		public UIViewController GetViewController ()
 		{
@@ -147,24 +150,23 @@ namespace MonoTouch.NUnit.UI {
 			}
 			return dv;
 		}
-		
+
 		void Run ()
 		{
 			if (!OpenWriter ("Run Everything"))
 				return;
 			try {
 				Run (suite);
-			}
-			finally {
+			} finally {
 				CloseWriter ();
 			}
 		}
-				
+
 		void Options ()
 		{
 			NavigationController.PushViewController (TouchOptions.Current.GetViewController (), true);				
 		}
-		
+
 		void Credits ()
 		{
 			var title = new MultilineElement ("Touch.Unit Runner\nCopyright 2011-2012 Xamarin Inc.\nAll rights reserved.");
@@ -184,13 +186,13 @@ namespace MonoTouch.NUnit.UI {
 			var dv = new DialogViewController (root, true) { Autorotate = true };
 			NavigationController.PushViewController (dv, true);				
 		}
-		
+
 		#region writer
-		
+
 		public TestResult Result { get; set; }
 
 		public TextWriter Writer { get; set; }
-		
+
 		static string SelectHostName (string[] names, int port)
 		{
 			if (names.Length == 0)
@@ -206,8 +208,7 @@ namespace MonoTouch.NUnit.UI {
 			using (var evt = new ManualResetEvent (false)) {
 				for (int i = names.Length - 1; i >= 0; i--) {
 					var name = names [i];
-					ThreadPool.QueueUserWorkItem ((v) =>
-					{
+					ThreadPool.QueueUserWorkItem ((v) => {
 						try {
 							var client = new TcpClient (name, port);
 							using (var writer = new StreamWriter (client.GetStream ())) {
@@ -234,7 +235,7 @@ namespace MonoTouch.NUnit.UI {
 			
 			return result;
 		}
-		
+
 		public bool OpenWriter (string message)
 		{
 			TouchOptions options = TouchOptions.Current;
@@ -248,11 +249,10 @@ namespace MonoTouch.NUnit.UI {
 						Console.WriteLine ("[{0}] Sending '{1}' results to {2}:{3}", now, message, hostname, options.HostPort);
 						try {
 							Writer = new TcpTextWriter (hostname, options.HostPort);
-						}
-						catch (SocketException) {
+						} catch (SocketException) {
 							UIAlertView alert = new UIAlertView ("Network Error", 
-								String.Format ("Cannot connect to {0}:{1}. Continue on console ?", hostname, options.HostPort), 
-								null, "Cancel", "Continue");
+								                    String.Format ("Cannot connect to {0}:{1}. Continue on console ?", hostname, options.HostPort), 
+								                    null, "Cancel", "Continue");
 							int button = -1;
 							alert.Clicked += delegate(object sender, UIButtonEventArgs e) {
 								button = (int)e.ButtonIndex;
@@ -272,17 +272,11 @@ namespace MonoTouch.NUnit.UI {
 					Writer = Console.Out;
 				}
 			}
-			
-			Writer.WriteLine ("[Runner executing:\t{0}]", message);
-			Writer.WriteLine ("[MonoTouch Version:\t{0}]", MonoTouch.Constants.Version);
-			UIDevice device = UIDevice.CurrentDevice;
-			Writer.WriteLine ("[{0}:\t{1} v{2}]", device.Model, device.SystemName, device.SystemVersion);
-			Writer.WriteLine ("[Device Name:\t{0}]", device.Name);
-			Writer.WriteLine ("[Device UDID:\t{0}]", UniqueIdentifier);
-			Writer.WriteLine ("[Device Locale:\t{0}]", NSLocale.CurrentLocale.Identifier);
-			Writer.WriteLine ("[Device Date/Time:\t{0}]", now); // to match earlier C.WL output
 
-			Writer.WriteLine ("[Bundle:\t{0}]", NSBundle.MainBundle.BundleIdentifier);
+			if (Writer is ITestWriter) {
+				WriteDebugData (Writer as ITestWriter, message, now);
+			}
+
 			// FIXME: add data about how the app was compiled (e.g. ARMvX, LLVM, GC and Linker options)
 			passed = 0;
 			ignored = 0;
@@ -291,17 +285,29 @@ namespace MonoTouch.NUnit.UI {
 			return true;
 		}
 
-		// Apple blacklisted `uniqueIdentifier` (for the appstore) but it's still 
+		void WriteDebugData (ITestWriter writer, string message, DateTime now)
+		{
+			writer.WriteCommentLine ("[Runner executing:\t{0}]", message);
+			writer.WriteCommentLine ("[MonoTouch Version:\t{0}]", MonoTouch.Constants.Version);
+			UIDevice device = UIDevice.CurrentDevice;
+			writer.WriteCommentLine ("[{0}:\t{1} v{2}]", device.Model, device.SystemName, device.SystemVersion);
+			writer.WriteCommentLine ("[Device Name:\t{0}]", device.Name);
+			writer.WriteCommentLine ("[Device UDID:\t{0}]", UniqueIdentifier);
+			writer.WriteCommentLine ("[Device Locale:\t{0}]", NSLocale.CurrentLocale.Identifier);
+			writer.WriteCommentLine ("[Device Date/Time:\t{0}]", now.ToString ());
+			writer.WriteCommentLine ("[Bundle:\t{0}]", NSBundle.MainBundle.BundleIdentifier);
+		}
+		// Apple blacklisted `uniqueIdentifier` (for the appstore) but it's still
 		// something useful to have inside the test logs
 		static string UniqueIdentifier {
 			get {
 				IntPtr handle = UIDevice.CurrentDevice.Handle;
 				if (UIDevice.CurrentDevice.RespondsToSelector (new Selector ("uniqueIdentifier")))
-					return NSString.FromHandle (Messaging.IntPtr_objc_msgSend (handle, Selector.GetHandle("uniqueIdentifier")));
+					return NSString.FromHandle (Messaging.IntPtr_objc_msgSend (handle, Selector.GetHandle ("uniqueIdentifier")));
 				return "unknown";
 			}
 		}
-		
+
 		public void CloseWriter ()
 		{
 			int total = passed + inconclusive + failed; // ignored are *not* run
@@ -310,18 +316,18 @@ namespace MonoTouch.NUnit.UI {
 			Writer.Close ();
 			Writer = null;
 		}
-		
+
 		#endregion
-		
+
 		Dictionary<TestSuite, TouchViewController> suites_dvc = new Dictionary<TestSuite, TouchViewController> ();
 		Dictionary<TestSuite, TestSuiteElement> suite_elements = new Dictionary<TestSuite, TestSuiteElement> ();
 		Dictionary<TestMethod, TestCaseElement> case_elements = new Dictionary<TestMethod, TestCaseElement> ();
-		
+
 		public void Show (TestSuite suite)
 		{
 			NavigationController.PushViewController (suites_dvc [suite], true);
 		}
-	
+
 		TestSuiteElement Setup (TestSuite suite)
 		{
 			TestSuiteElement tse = new TestSuiteElement (suite, this);
@@ -362,14 +368,14 @@ namespace MonoTouch.NUnit.UI {
 			suites_dvc.Add (suite, new TouchViewController (root));
 			return tse;
 		}
-		
+
 		TestCaseElement Setup (TestMethod test)
 		{
 			TestCaseElement tce = new TestCaseElement (test, this);
 			case_elements.Add (test, tce);
 			return tce;
 		}
-				
+
 		public void TestStarted (ITest test)
 		{
 			if (test is TestSuite) {
@@ -377,7 +383,7 @@ namespace MonoTouch.NUnit.UI {
 				Writer.WriteLine (test.Name);
 			}
 		}
-		
+
 		public void TestFinished (ITestResult r)
 		{
 			TestResult result = r as TestResult;
