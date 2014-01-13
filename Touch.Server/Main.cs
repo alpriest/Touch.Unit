@@ -69,6 +69,22 @@ class SimpleListener
 			createProcess ();
 			Console.WriteLine ("Process spawned");
 
+			var tries = 0;
+			var found = false;
+			do {
+				if (server.Pending ()) {
+					found = true;
+				} else {
+					Thread.Sleep (new TimeSpan (0, 0, 5));
+				}
+				tries++;
+			} while (!found && tries < 5);
+
+			if (!found) {
+				Console.WriteLine ("No client found, exiting");
+				return 1;
+			}
+
 			do {
 				using (TcpClient client = server.AcceptTcpClient ()) {
 					Console.WriteLine ("Accepted Tcp Client");
@@ -239,11 +255,11 @@ class SimpleListener
 								output.AppendLine (e.Data);
 							}
 						};
-						if (!string.IsNullOrEmpty(user_name))
+						if (!string.IsNullOrEmpty (user_name))
 							proc.StartInfo.UserName = user_name;
-						if (!string.IsNullOrEmpty(password))
-							proc.StartInfo.Password = Password(password);
-						proc.Start();
+						if (!string.IsNullOrEmpty (password))
+							proc.StartInfo.Password = Password (password);
+						proc.Start ();
 						proc.BeginErrorReadLine ();
 						proc.BeginOutputReadLine ();
 						proc.WaitForExit ();
